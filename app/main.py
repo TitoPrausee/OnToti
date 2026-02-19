@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from . import persona as persona_mod
 from .config_manager import ConfigManager
+from .message_bus import create_message_bus
 from .orchestrator import Orchestrator
 from .provider import ProviderRouter
 from .secrets_store import SecretsStore
@@ -18,14 +19,15 @@ from .security import is_client_allowed
 from .store import MemoryStore, default_paths
 
 
-app = FastAPI(title="OnToti", version="0.4.0")
+app = FastAPI(title="OnToti", version="0.5.0")
 paths = default_paths("data")
 config_path = Path("config.json")
 config_manager = ConfigManager(config_path)
 store = MemoryStore(paths.db)
 secrets = SecretsStore(paths.root / "secrets.json")
 provider = ProviderRouter(config_path, secrets=secrets)
-orchestrator = Orchestrator(store=store, paths=paths, provider=provider, config_path=config_path)
+bus = create_message_bus(config_manager.load())
+orchestrator = Orchestrator(store=store, paths=paths, provider=provider, config_path=config_path, bus=bus)
 
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
@@ -69,6 +71,10 @@ class SetupApplyIn(BaseModel):
     tailnet_only: bool | None = None
     tailscale_cidrs: list[str] | None = None
     tailscale_node_allowlist: list[str] | None = None
+    pipeline_mode: str | None = None
+    pipeline_max_retries: int | None = None
+    bus_backend: str | None = None
+    bus_redis_url: str | None = None
     max_active_agents: int | None = None
     use_copilot: bool = False
     copilot_token: str | None = None
@@ -151,17 +157,24 @@ def provider_test(payload: ProviderTestIn) -> dict[str, Any]:
 
 @app.get("/setup/state")
 def setup_state() -> dict[str, Any]:
+    cfg = config_manager.load()
     return {
-        "config": config_manager.load(),
+        "config": cfg,
         "persona": persona_mod.load_or_create(paths.persona),
         "provider": provider.describe_active(),
         "secrets": secrets.public_summary(),
+        "bus": {
+            "backend": cfg.get("bus", {}).get("backend", "local"),
+            "recent_messages": len(bus.recent(limit=1000)),
+        },
         "diagnostics": diagnostics(),
     }
 
 
 @app.post("/setup/apply")
 def setup_apply(payload: SetupApplyIn) -> dict[str, Any]:
+    global bus, orchestrator
+
     cfg = config_manager.load()
     persona = persona_mod.load_or_create(paths.persona)
 
@@ -206,6 +219,18 @@ def setup_apply(payload: SetupApplyIn) -> dict[str, Any]:
     if payload.max_active_agents is not None:
         agents_cfg["max_active"] = max(1, int(payload.max_active_agents))
 
+    pipelines_cfg = cfg.setdefault("pipelines", {})
+    if payload.pipeline_mode:
+        pipelines_cfg["mode"] = payload.pipeline_mode
+    if payload.pipeline_max_retries is not None:
+        pipelines_cfg["max_retries"] = max(0, int(payload.pipeline_max_retries))
+
+    bus_cfg = cfg.setdefault("bus", {})
+    if payload.bus_backend:
+        bus_cfg["backend"] = payload.bus_backend
+    if payload.bus_redis_url:
+        bus_cfg["redis_url"] = payload.bus_redis_url
+
     if payload.use_copilot:
         if not payload.copilot_token:
             raise HTTPException(status_code=400, detail="copilot_token is required when use_copilot=true")
@@ -233,6 +258,10 @@ def setup_apply(payload: SetupApplyIn) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=msg)
 
     config_manager.save(cfg)
+
+    bus = create_message_bus(cfg)
+    orchestrator = Orchestrator(store=store, paths=paths, provider=provider, config_path=config_path, bus=bus)
+
     store.log_audit(
         actor="setup",
         action="apply",
@@ -240,6 +269,8 @@ def setup_apply(payload: SetupApplyIn) -> dict[str, Any]:
             "provider_active": cfg.get("provider", {}).get("active"),
             "secrets_count": secrets.public_summary().get("count"),
             "tailnet_only": cfg.get("security", {}).get("tailnet_only", False),
+            "pipeline_mode": cfg.get("pipelines", {}).get("mode", "sequential"),
+            "bus_backend": cfg.get("bus", {}).get("backend", "local"),
         },
         result="ok",
     )
@@ -314,6 +345,16 @@ def context() -> dict[str, Any]:
 @app.get("/agents")
 def agents() -> dict[str, Any]:
     return {"agents": orchestrator.agents_snapshot()}
+
+
+@app.get("/topology")
+def topology() -> dict[str, Any]:
+    return orchestrator.topology_snapshot()
+
+
+@app.get("/bus/messages")
+def bus_messages(limit: int = 200) -> dict[str, Any]:
+    return {"messages": bus.recent(limit=limit)}
 
 
 @app.get("/interactions")

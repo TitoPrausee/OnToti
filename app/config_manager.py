@@ -41,4 +41,16 @@ class ConfigManager:
         if "tailscale_node_allowlist" in security and not isinstance(security["tailscale_node_allowlist"], list):
             return False, "security.tailscale_node_allowlist must be a list"
 
+        pipelines = data.get("pipelines", {})
+        if pipelines and not isinstance(pipelines, dict):
+            return False, "pipelines must be an object"
+        if "max_retries" in pipelines and not isinstance(pipelines["max_retries"], int):
+            return False, "pipelines.max_retries must be int"
+
+        bus = data.get("bus", {})
+        if bus and not isinstance(bus, dict):
+            return False, "bus must be an object"
+        if "max_messages" in bus and not isinstance(bus["max_messages"], int):
+            return False, "bus.max_messages must be int"
+
         return True, "ok"

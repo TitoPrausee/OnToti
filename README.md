@@ -19,21 +19,32 @@ Im Tab `Setup` kannst du konfigurieren:
 - Provider (github_models/openai/ollama/lmstudio)
 - API-Key-ENV + API-Key-Wert (lokal in `data/secrets.json`)
 - Security: Sandbox, Tailnet-only, Tailscale CIDRs, Node-Allowlist
-- Maximal aktive Agenten
+- Agenten-Limit, Pipeline-Modus und Retries
+- Message-Bus Backend (local/redis)
 - Copilot Quick Setup (Token pruefen + aktivieren)
 
-## Neue Umsetzungen aus offenen Issues
+## Umgesetzte Roadmap-Issues
 
-- Issue #1: Tailscale Hardening Basis (`tailnet_only`, CIDRs, Node-Allowlist)
-- Issue #2: Service-Templates fuer systemd/launchd/Windows
-- Issue #19: Multi-stage Docker + Production Compose + optionales Chromium Profil
-- Issue #20: Unit-Tests + CI Workflow
+- `#1` Tailscale Hardening Basis
+- `#2` Service-Templates fuer systemd/launchd/Windows
+- `#3` Multi-Agent Message Bus (local + optional redis)
+- `#4` Pipeline Engine (sequential/parallel + Retry + Zykluscheck)
+- `#5` Agenten-Topologie im UI
+- `#19` Container Production Setup
+- `#20` Test- und QA-Grundlage (CI + Unit Tests)
+
+## Neue Endpunkte
+
+- `GET /topology`
+- `GET /bus/messages`
+- `GET /security/status`
 
 ## Doku
 
 - Web-UI Setup: `/Users/tito1/Desktop/Test/docs/WEBUI_SETUP.md`
 - Tailscale Hardening: `/Users/tito1/Desktop/Test/docs/TAILSCALE_HARDENING.md`
 - Service Setup: `/Users/tito1/Desktop/Test/docs/SERVICE_SETUP.md`
+- Pipeline + Bus: `/Users/tito1/Desktop/Test/docs/PIPELINE_BUS.md`
 - QA Strategie: `/Users/tito1/Desktop/Test/docs/QA_STRATEGY.md`
 - Offene Planung: `/Users/tito1/Desktop/Test/docs/OPEN_ISSUES.md`
 

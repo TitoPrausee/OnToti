@@ -190,3 +190,29 @@ button:hover {
     flex-direction: column;
   }
 }
+
+.topology-canvas {
+  min-height: 260px;
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 0.8rem;
+}
+
+.topo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.topo-node {
+  border: 1px solid var(--line);
+  background: #fffaf2;
+  padding: 0.5rem;
+  min-width: 180px;
+}
+
+.edge-line {
+  font-size: 0.85rem;
+  color: #5f5f5f;
+}

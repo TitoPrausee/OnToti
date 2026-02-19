@@ -42,5 +42,15 @@
   },
   "agents": {
     "max_active": 4
+  },
+  "pipelines": {
+    "mode": "sequential",
+    "max_retries": 1
+  },
+  "bus": {
+    "backend": "local",
+    "redis_url": "redis://localhost:6379/0",
+    "stream_key": "ontoti:bus",
+    "max_messages": 1000
   }
 }

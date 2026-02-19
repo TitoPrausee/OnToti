@@ -41,11 +41,72 @@ function splitCsv(value) {
     .filter(Boolean);
 }
 
+function renderTopology(topology) {
+  const root = $("#topology-canvas");
+  root.innerHTML = "";
+  const nodes = topology.nodes || [];
+  const edges = topology.edges || [];
+
+  if (!nodes.length) {
+    root.textContent = "Noch keine Agenten aktiv.";
+    return;
+  }
+
+  const childrenByParent = {};
+  nodes.forEach((n) => {
+    const p = n.parent_id || "root";
+    childrenByParent[p] = childrenByParent[p] || [];
+    childrenByParent[p].push(n);
+  });
+
+  const levels = [];
+  let current = childrenByParent.root || [];
+  let visited = new Set();
+  while (current.length) {
+    levels.push(current);
+    const next = [];
+    current.forEach((n) => {
+      visited.add(n.agent_id);
+      (childrenByParent[n.agent_id] || []).forEach((c) => {
+        if (!visited.has(c.agent_id)) next.push(c);
+      });
+    });
+    current = next;
+  }
+
+  edges.forEach((e) => {
+    const el = document.createElement("div");
+    el.className = "edge-line";
+    el.textContent = `${e.from} -> ${e.to}`;
+    root.appendChild(el);
+  });
+
+  levels.forEach((lvl) => {
+    const row = document.createElement("div");
+    row.className = "topo-row";
+    lvl.forEach((n) => {
+      const card = document.createElement("div");
+      card.className = "topo-node";
+      card.innerHTML = `
+        <strong>${n.role}</strong><br>
+        <small>${n.agent_id}</small><br>
+        <small>Status: ${n.status}</small><br>
+        <small>Token: ${n.token_usage || 0}</small>
+      `;
+      row.appendChild(card);
+    });
+    root.appendChild(row);
+  });
+}
+
 function fillSetupForm(state) {
   const cfg = state.config || {};
   const persona = state.persona || {};
   const provider = cfg.provider || {};
   const security = cfg.security || {};
+  const pipelines = cfg.pipelines || {};
+  const bus = cfg.bus || {};
+
   const active = provider.active || "github_models";
   const activeCfg = (provider.options || {})[active] || {};
 
@@ -61,6 +122,10 @@ function fillSetupForm(state) {
   $("#setup-node-allowlist").value = (security.tailscale_node_allowlist || []).join(", ");
   $("#setup-allowed-paths").value = (security.allowed_paths || []).join(", ");
   $("#setup-max-agents").value = (cfg.agents || {}).max_active || 4;
+  $("#setup-pipeline-mode").value = pipelines.mode || "sequential";
+  $("#setup-pipeline-retries").value = pipelines.max_retries ?? 1;
+  $("#setup-bus-backend").value = bus.backend || "local";
+  $("#setup-bus-redis-url").value = bus.redis_url || "redis://localhost:6379/0";
 
   $("#setup-state-view").textContent = JSON.stringify(state, null, 2);
 }
@@ -81,15 +146,30 @@ $("#chat-form").addEventListener("submit", async (e) => {
   try {
     const out = await api("/chat", { method: "POST", body: JSON.stringify({ session_id, text }) });
     appendMsg("bot", out.reply || "(leer)");
+    await Promise.all([refreshTopology(), refreshBus(), refreshAgents()]);
   } catch (err) {
     appendMsg("bot", `Fehler: ${err.message}`);
   }
 });
 
-$("#refresh-agents").addEventListener("click", async () => {
+async function refreshAgents() {
   const out = await api("/agents");
   $("#agents-view").textContent = JSON.stringify(out, null, 2);
-});
+}
+
+async function refreshTopology() {
+  const out = await api("/topology");
+  renderTopology(out);
+}
+
+async function refreshBus() {
+  const out = await api("/bus/messages?limit=200");
+  $("#bus-view").textContent = JSON.stringify(out, null, 2);
+}
+
+$("#refresh-agents").addEventListener("click", refreshAgents);
+$("#refresh-topology").addEventListener("click", refreshTopology);
+$("#refresh-bus").addEventListener("click", refreshBus);
 
 $("#refresh-audit").addEventListener("click", async () => {
   const out = await api("/audit?limit=100");
@@ -116,6 +196,10 @@ $("#setup-apply").addEventListener("click", async () => {
     tailscale_node_allowlist: splitCsv($("#setup-node-allowlist").value),
     allowed_paths: splitCsv($("#setup-allowed-paths").value),
     max_active_agents: Number($("#setup-max-agents").value || 4),
+    pipeline_mode: $("#setup-pipeline-mode").value,
+    pipeline_max_retries: Number($("#setup-pipeline-retries").value || 1),
+    bus_backend: $("#setup-bus-backend").value,
+    bus_redis_url: $("#setup-bus-redis-url").value.trim() || null,
     use_copilot: $("#setup-use-copilot").checked,
     copilot_token: $("#setup-copilot-token").value.trim() || null,
   };
@@ -163,7 +247,7 @@ $("#save-config").addEventListener("click", async () => {
 (async function init() {
   try {
     await loadSetupState();
-    $("#refresh-agents").click();
+    await Promise.all([refreshTopology(), refreshBus(), refreshAgents()]);
     $("#refresh-audit").click();
     const interactions = await api("/interactions?limit=20");
     interactions.events.reverse().forEach((evt) => {
