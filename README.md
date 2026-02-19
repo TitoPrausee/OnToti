@@ -56,3 +56,37 @@ Im Tab `Setup` kannst du konfigurieren:
 ## Hinweis
 
 Secrets werden lokal in `data/secrets.json` gespeichert (Dateirechte werden auf restriktiv gesetzt, sofern vom OS erlaubt).
+
+## Offene Planung (Roadmap)
+
+Die folgenden Punkte sind als naechste Ausbaustufen geplant und werden als einzelne GitHub-Issues verfolgt:
+
+1. Tailscale Netzwerk-Hardening (Tailnet-only, Allowlist, Serve/Funnel)
+2. Daemon/Service Installation (systemd, launchd, Windows Service)
+3. Multi-Agent Message Bus (Redis Streams + Loop-Erkennung)
+4. Pipeline Engine fuer Agenten (deklarativ, retry/timeout)
+5. Agenten-Topologie Live-Visualisierung im UI
+6. Scheduler + Trigger (Cron Sekundenfeld, Webhook/File/API)
+7. Heartbeat und proaktive Nachrichten
+8. Tool-Sandbox und zentrale Policy Engine
+9. Unveraenderliches Audit Log mit Suche/Export
+10. Secret Management Hardening (age/pass/keychain)
+11. MCP Server Integration
+12. Skill Hot-Reload + Versionierung + Rollback
+13. Messaging Adapter Framework (Telegram/Discord zuerst)
+14. Multi-User Session Management
+15. Provider-Abstraktion erweitern (Claude/Gemini/LM Studio)
+16. Vollstaendiger Offline-Betrieb fuer lokale Modelle
+17. Browser Automation Skill (Playwright)
+18. Plugin/Webhook Framework
+19. Container Production Setup (multi-stage/profiles)
+20. Test- und QA-Strategie mit CI
+
+Details und Issue-Texte: `/Users/tito1/Desktop/Test/docs/OPEN_ISSUES.md`
+
+Automatische Erstellung der Issues:
+
+```bash
+cd /Users/tito1/Desktop/Test
+./scripts/create_github_issues.sh TitoPrausee/OnToti
+```
