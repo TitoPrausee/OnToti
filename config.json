@@ -1,0 +1,41 @@
+{
+  "provider": {
+    "active": "ollama",
+    "options": {
+      "github_models": {
+        "base_url": "https://models.inference.ai.azure.com",
+        "model": "gpt-5-mini",
+        "api_key_env": "GITHUB_TOKEN"
+      },
+      "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-5-mini",
+        "api_key_env": "OPENAI_API_KEY"
+      },
+      "ollama": {
+        "base_url": "http://localhost:11434/v1",
+        "model": "llama3.1:8b",
+        "api_key_env": ""
+      },
+      "lmstudio": {
+        "base_url": "http://localhost:1234/v1",
+        "model": "local-model",
+        "api_key_env": ""
+      }
+    }
+  },
+  "copilot": {
+    "connected": false,
+    "github_login": null,
+    "token_env": "GITHUB_TOKEN"
+  },
+  "security": {
+    "sandbox_mode": true,
+    "allowed_paths": [
+      "/Users/tito1/Desktop/Test"
+    ]
+  },
+  "agents": {
+    "max_active": 3
+  }
+}

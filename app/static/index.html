@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Soul Bot Control</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg"></div>
+    <main class="app-shell">
+      <header>
+        <h1>Soul Bot Control</h1>
+        <p>Finalisierter Prototyp mit Web-Setup, Copilot-Wizard und Multi-Agent-Basis</p>
+      </header>
+
+      <nav class="tabs">
+        <button class="tab active" data-tab="chat">Chat</button>
+        <button class="tab" data-tab="agents">Agents</button>
+        <button class="tab" data-tab="audit">Audit</button>
+        <button class="tab" data-tab="setup">Setup</button>
+        <button class="tab" data-tab="config">Raw Config</button>
+      </nav>
+
+      <section id="chat" class="panel active">
+        <div id="chat-log" class="log-box"></div>
+        <form id="chat-form" class="row">
+          <input id="session-id" value="default" placeholder="Session ID" />
+          <input id="chat-input" placeholder="Nachricht an den Bot" />
+          <button type="submit">Senden</button>
+        </form>
+      </section>
+
+      <section id="agents" class="panel">
+        <button id="refresh-agents">Aktualisieren</button>
+        <pre id="agents-view" class="code-box"></pre>
+      </section>
+
+      <section id="audit" class="panel">
+        <button id="refresh-audit">Aktualisieren</button>
+        <pre id="audit-view" class="code-box"></pre>
+      </section>
+
+      <section id="setup" class="panel">
+        <div class="config-grid">
+          <div class="card">
+            <h3>1) Identity</h3>
+            <input id="setup-bot-name" placeholder="Bot Name" />
+            <input id="setup-bot-tone" placeholder="Ton (z. B. direkt und respektvoll)" />
+
+            <h3>2) Provider</h3>
+            <select id="setup-provider-active">
+              <option value="github_models">github_models</option>
+              <option value="openai">openai</option>
+              <option value="ollama">ollama</option>
+              <option value="lmstudio">lmstudio</option>
+            </select>
+            <input id="setup-provider-base-url" placeholder="Base URL" />
+            <input id="setup-provider-model" placeholder="Model" />
+            <input id="setup-provider-key-env" value="GITHUB_TOKEN" placeholder="API Key ENV Name" />
+            <input id="setup-provider-key-value" type="password" placeholder="API Key (wird lokal in data/secrets.json gespeichert)" />
+
+            <h3>3) Security + Agents</h3>
+            <label class="inline-check"><input id="setup-sandbox-mode" type="checkbox" checked /> Sandbox aktiv</label>
+            <input id="setup-allowed-paths" value="/Users/tito1/Desktop/Test" placeholder="Allow Paths (Komma-getrennt)" />
+            <input id="setup-max-agents" value="4" type="number" min="1" max="32" placeholder="Max aktive Agenten" />
+          </div>
+
+          <div class="card">
+            <h3>4) Copilot Quick Setup</h3>
+            <p>Optional: GitHub Token prüfen und direkt auf <code>github_models</code> umstellen.</p>
+            <label class="inline-check"><input id="setup-use-copilot" type="checkbox" /> Copilot jetzt verbinden</label>
+            <input id="setup-copilot-token" type="password" placeholder="GitHub Token" />
+
+            <div class="row wrap">
+              <button id="setup-load">Setup laden</button>
+              <button id="setup-apply">Setup anwenden</button>
+              <button id="setup-test-provider">Provider testen</button>
+            </div>
+
+            <p id="setup-status" class="status"></p>
+            <pre id="setup-state-view" class="code-box small"></pre>
+          </div>
+        </div>
+      </section>
+
+      <section id="config" class="panel">
+        <div class="card">
+          <h3>Raw Config JSON</h3>
+          <textarea id="config-editor" rows="18"></textarea>
+          <div class="row">
+            <button id="load-config">Laden</button>
+            <button id="save-config">Speichern</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

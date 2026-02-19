@@ -1,0 +1,8 @@
+.venv/
+.pycache/
+__pycache__/
+*.pyc
+
+/data/secrets.json
+/data/memory.db
+/logs/

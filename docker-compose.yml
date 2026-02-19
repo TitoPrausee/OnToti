@@ -1,0 +1,20 @@
+version: "3.9"
+services:
+  bot:
+    build: .
+    container_name: soul-bot
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./skills:/app/skills
+    environment:
+      - TZ=UTC
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: soul-bot-redis
+    ports:
+      - "6379:6379"
