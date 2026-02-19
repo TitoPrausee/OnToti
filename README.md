@@ -1,4 +1,4 @@
-# Soul Bot Prototype (Web-Setup Ready)
+# OnToti (Web-Setup Ready)
 
 Dieses Projekt ist ein erster finalisierter Prototyp mit Fokus auf:
 - Self-hosted Bot Runtime
