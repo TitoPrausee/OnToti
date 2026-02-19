@@ -1,65 +1,74 @@
-# OnToti (Web-Setup Ready)
+# OnToti
 
-OnToti ist ein selbst gehosteter KI-Assistent mit Web-Setup, adaptiver Persona, Multi-Agent-Basis und Copilot-Integration.
+OnToti ist ein selbst gehosteter KI-Assistent mit:
+- Web-UI fuer komplette Einrichtung und Betrieb
+- adaptiver Persona und persistentem Speicher
+- Multi-Agent-Orchestrierung mit Pipeline-Modus
+- Message-Bus (local oder redis)
+- Scheduler (Cron mit Sekundenfeld) + Heartbeat/Jobs
+- Tailscale-Hardening (tailnet-only, CIDRs, Node-Allowlist)
+- Audit-Log mit Hash-Chain-Integritaet
 
-## Quickstart
+## One-Command Installation
+
+### macOS / Linux
 
 ```bash
 cd /Users/tito1/Desktop/Test
-./scripts/setup_webui.sh
-./scripts/run_webui.sh
+./install.sh
 ```
 
-Oeffnen: `http://127.0.0.1:8000/`
+### Windows
 
-## Web-Setup Features
+```powershell
+cd C:\OnToti
+.\install.ps1
+```
 
-Im Tab `Setup` kannst du konfigurieren:
-- Bot-Identity (Name/Ton)
-- Provider (github_models/openai/ollama/lmstudio)
-- API-Key-ENV + API-Key-Wert (lokal in `data/secrets.json`)
-- Security: Sandbox, Tailnet-only, Tailscale CIDRs, Node-Allowlist
-- Agenten-Limit, Pipeline-Modus und Retries
-- Message-Bus Backend (local/redis)
-- Copilot Quick Setup (Token pruefen + aktivieren)
+Details: `/Users/tito1/Desktop/Test/docs/INSTALL.md`
 
-## Umgesetzte Roadmap-Issues
+## Start
 
-- `#1` Tailscale Hardening Basis
-- `#2` Service-Templates fuer systemd/launchd/Windows
-- `#3` Multi-Agent Message Bus (local + optional redis)
-- `#4` Pipeline Engine (sequential/parallel + Retry + Zykluscheck)
-- `#5` Agenten-Topologie im UI
-- `#19` Container Production Setup
-- `#20` Test- und QA-Grundlage (CI + Unit Tests)
+```bash
+cd /Users/tito1/Desktop/Test
+source .venv/bin/activate
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
 
-## Neue Endpunkte
+Web UI: `http://127.0.0.1:8000/`
 
-- `GET /topology`
-- `GET /bus/messages`
-- `GET /security/status`
+## Web-UI Bereiche
 
-## Doku
+- `Chat`: Multi-Session Chat
+- `Topologie`: Agentenstruktur mit Tokenverbrauch
+- `Agents`: Rohstatus der Agenten
+- `Bus`: Nachrichtenfluss zwischen Agenten
+- `Operations`: Sessions, Scheduler, Webhooks, Policy, Audit
+- `Setup`: Provider/Sicherheit/Pipeline/Bus/Copilot
+- `Raw Config`: direkter JSON-Editor
 
-- Web-UI Setup: `/Users/tito1/Desktop/Test/docs/WEBUI_SETUP.md`
-- Tailscale Hardening: `/Users/tito1/Desktop/Test/docs/TAILSCALE_HARDENING.md`
-- Service Setup: `/Users/tito1/Desktop/Test/docs/SERVICE_SETUP.md`
-- Pipeline + Bus: `/Users/tito1/Desktop/Test/docs/PIPELINE_BUS.md`
-- QA Strategie: `/Users/tito1/Desktop/Test/docs/QA_STRATEGY.md`
-- Offene Planung: `/Users/tito1/Desktop/Test/docs/OPEN_ISSUES.md`
+## API Highlights
 
-## Service/Container Dateien
-
-- systemd: `/Users/tito1/Desktop/Test/deployment/services/ontoti.service`
-- launchd: `/Users/tito1/Desktop/Test/deployment/services/com.ontoti.bot.plist`
-- Windows: `/Users/tito1/Desktop/Test/deployment/services/install-windows-service.ps1`
-- Docker: `/Users/tito1/Desktop/Test/Dockerfile`
-- Compose: `/Users/tito1/Desktop/Test/docker-compose.yml`
-- Compose Prod: `/Users/tito1/Desktop/Test/docker-compose.prod.yml`
+- Runtime: `GET /health`, `GET /ready`, `GET /diagnostics`
+- Setup: `GET /setup/state`, `POST /setup/apply`
+- Sessions: `GET /sessions`, `POST /sessions`, `DELETE /sessions/{id}`
+- Scheduler: `GET /jobs`, `POST /jobs`, `PUT /jobs/{id}`, `POST /jobs/{id}/pause`, `POST /jobs/{id}/resume`
+- Pipeline/Bus: `GET /topology`, `GET /bus/messages`
+- Webhooks: `POST /webhooks/{source}`, `GET /webhooks`
+- Policy: `GET /policy/status`, `POST /policy/file-check`, `POST /policy/shell-check`
+- Audit: `GET /audit`, `GET /audit/verify`
 
 ## Tests
 
 ```bash
 cd /Users/tito1/Desktop/Test
 ./scripts/run_tests.sh
+./scripts/smoke_test.sh
 ```
+
+## Relevante Dateien
+
+- Config: `/Users/tito1/Desktop/Test/config.json`
+- Secrets: `/Users/tito1/Desktop/Test/data/secrets.json`
+- DB: `/Users/tito1/Desktop/Test/data/memory.db`
+- Installer: `/Users/tito1/Desktop/Test/install.sh`, `/Users/tito1/Desktop/Test/install.ps1`

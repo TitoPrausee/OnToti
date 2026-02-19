@@ -44,12 +44,16 @@ class ConfigManager:
         pipelines = data.get("pipelines", {})
         if pipelines and not isinstance(pipelines, dict):
             return False, "pipelines must be an object"
+        if "mode" in pipelines and pipelines.get("mode") not in {"sequential", "parallel"}:
+            return False, "pipelines.mode must be sequential or parallel"
         if "max_retries" in pipelines and not isinstance(pipelines["max_retries"], int):
             return False, "pipelines.max_retries must be int"
 
         bus = data.get("bus", {})
         if bus and not isinstance(bus, dict):
             return False, "bus must be an object"
+        if "backend" in bus and bus.get("backend") not in {"local", "redis"}:
+            return False, "bus.backend must be local or redis"
         if "max_messages" in bus and not isinstance(bus["max_messages"], int):
             return False, "bus.max_messages must be int"
 

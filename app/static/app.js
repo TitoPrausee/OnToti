@@ -6,9 +6,7 @@ function setTab(target) {
   $$(".panel").forEach((p) => p.classList.toggle("active", p.id === target));
 }
 
-$$(".tab").forEach((btn) => {
-  btn.addEventListener("click", () => setTab(btn.dataset.tab));
-});
+$$(".tab").forEach((btn) => btn.addEventListener("click", () => setTab(btn.dataset.tab)));
 
 async function api(url, options = {}) {
   const resp = await fetch(url, {
@@ -52,6 +50,15 @@ function renderTopology(topology) {
     return;
   }
 
+  const edgeWrap = document.createElement("div");
+  edges.forEach((e) => {
+    const el = document.createElement("div");
+    el.className = "edge-line";
+    el.textContent = `${e.from} -> ${e.to} (${e.task_id})`;
+    edgeWrap.appendChild(el);
+  });
+  root.appendChild(edgeWrap);
+
   const childrenByParent = {};
   nodes.forEach((n) => {
     const p = n.parent_id || "root";
@@ -74,13 +81,6 @@ function renderTopology(topology) {
     current = next;
   }
 
-  edges.forEach((e) => {
-    const el = document.createElement("div");
-    el.className = "edge-line";
-    el.textContent = `${e.from} -> ${e.to}`;
-    root.appendChild(el);
-  });
-
   levels.forEach((lvl) => {
     const row = document.createElement("div");
     row.className = "topo-row";
@@ -90,6 +90,7 @@ function renderTopology(topology) {
       card.innerHTML = `
         <strong>${n.role}</strong><br>
         <small>${n.agent_id}</small><br>
+        <small>Task: ${n.task_id}</small><br>
         <small>Status: ${n.status}</small><br>
         <small>Token: ${n.token_usage || 0}</small>
       `;
@@ -97,6 +98,61 @@ function renderTopology(topology) {
     });
     root.appendChild(row);
   });
+}
+
+async function refreshSessions() {
+  const out = await api("/sessions");
+  const sessions = out.sessions || [];
+  $("#sessions-view").textContent = JSON.stringify(out, null, 2);
+
+  const select = $("#session-id");
+  const current = select.value || "default";
+  select.innerHTML = "";
+  if (!sessions.length) {
+    const op = document.createElement("option");
+    op.value = "default";
+    op.textContent = "default";
+    select.appendChild(op);
+    return;
+  }
+
+  sessions.forEach((s) => {
+    const op = document.createElement("option");
+    op.value = s.session_id;
+    op.textContent = `${s.display_name} (${s.session_id})`;
+    if (s.session_id === current) op.selected = true;
+    select.appendChild(op);
+  });
+}
+
+async function refreshAgents() {
+  const out = await api("/agents");
+  $("#agents-view").textContent = JSON.stringify(out, null, 2);
+}
+
+async function refreshTopology() {
+  const out = await api("/topology");
+  renderTopology(out);
+}
+
+async function refreshBus() {
+  const out = await api("/bus/messages?limit=200");
+  $("#bus-view").textContent = JSON.stringify(out, null, 2);
+}
+
+async function refreshAudit() {
+  const out = await api("/audit?limit=100");
+  $("#policy-view").textContent = JSON.stringify(out, null, 2);
+}
+
+async function refreshJobs() {
+  const out = await api("/jobs");
+  $("#jobs-view").textContent = JSON.stringify(out, null, 2);
+}
+
+async function refreshWebhooks() {
+  const out = await api("/webhooks?limit=50");
+  $("#webhooks-view").textContent = JSON.stringify(out, null, 2);
 }
 
 function fillSetupForm(state) {
@@ -138,43 +194,81 @@ async function loadSetupState() {
 
 $("#chat-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const session_id = $("#session-id").value.trim() || "default";
+  const session_id = $("#session-id").value || "default";
   const text = $("#chat-input").value.trim();
   if (!text) return;
-  appendMsg("user", text);
+  appendMsg("user", `[${session_id}] ${text}`);
   $("#chat-input").value = "";
   try {
     const out = await api("/chat", { method: "POST", body: JSON.stringify({ session_id, text }) });
     appendMsg("bot", out.reply || "(leer)");
-    await Promise.all([refreshTopology(), refreshBus(), refreshAgents()]);
+    await Promise.all([refreshTopology(), refreshBus(), refreshAgents(), refreshSessions()]);
   } catch (err) {
     appendMsg("bot", `Fehler: ${err.message}`);
   }
 });
 
-async function refreshAgents() {
-  const out = await api("/agents");
-  $("#agents-view").textContent = JSON.stringify(out, null, 2);
-}
-
-async function refreshTopology() {
-  const out = await api("/topology");
-  renderTopology(out);
-}
-
-async function refreshBus() {
-  const out = await api("/bus/messages?limit=200");
-  $("#bus-view").textContent = JSON.stringify(out, null, 2);
-}
-
 $("#refresh-agents").addEventListener("click", refreshAgents);
 $("#refresh-topology").addEventListener("click", refreshTopology);
 $("#refresh-bus").addEventListener("click", refreshBus);
 
-$("#refresh-audit").addEventListener("click", async () => {
-  const out = await api("/audit?limit=100");
-  $("#audit-view").textContent = JSON.stringify(out, null, 2);
+$("#reload-sessions").addEventListener("click", refreshSessions);
+$("#create-session").addEventListener("click", async () => {
+  const session_id = $("#new-session-id").value.trim();
+  const display_name = $("#new-session-name").value.trim() || null;
+  if (!session_id) return;
+  await api("/sessions", { method: "POST", body: JSON.stringify({ session_id, display_name }) });
+  $("#new-session-id").value = "";
+  $("#new-session-name").value = "";
+  await refreshSessions();
 });
+
+$("#reload-jobs").addEventListener("click", refreshJobs);
+$("#create-job").addEventListener("click", async () => {
+  const kind = $("#job-kind").value;
+  const session = $("#job-session").value.trim() || "default";
+  const text = $("#job-text").value.trim() || "";
+  const payload = kind === "heartbeat" ? { kind, channel: text || "web-ui" } : { kind, session_id: session, text };
+
+  await api("/jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      name: $("#job-name").value.trim() || `job-${Date.now()}`,
+      cron: $("#job-cron").value.trim(),
+      enabled: true,
+      payload,
+    }),
+  });
+  await refreshJobs();
+});
+
+$("#reload-webhooks").addEventListener("click", refreshWebhooks);
+$("#send-webhook").addEventListener("click", async () => {
+  const source = $("#webhook-source").value.trim() || "manual";
+  const text = $("#webhook-text").value.trim() || "Webhook";
+  await api(`/webhooks/${encodeURIComponent(source)}`, {
+    method: "POST",
+    body: JSON.stringify({ payload: { text } }),
+  });
+  await refreshWebhooks();
+});
+
+$("#check-path").addEventListener("click", async () => {
+  const out = await api("/policy/file-check", { method: "POST", body: JSON.stringify({ path: $("#policy-path").value }) });
+  $("#policy-view").textContent = JSON.stringify(out, null, 2);
+});
+
+$("#check-cmd").addEventListener("click", async () => {
+  const out = await api("/policy/shell-check", { method: "POST", body: JSON.stringify({ command: $("#policy-cmd").value }) });
+  $("#policy-view").textContent = JSON.stringify(out, null, 2);
+});
+
+$("#verify-audit").addEventListener("click", async () => {
+  const out = await api("/audit/verify");
+  $("#policy-view").textContent = JSON.stringify(out, null, 2);
+});
+
+$("#reload-audit").addEventListener("click", refreshAudit);
 
 $("#setup-load").addEventListener("click", async () => {
   await loadSetupState();
@@ -247,8 +341,7 @@ $("#save-config").addEventListener("click", async () => {
 (async function init() {
   try {
     await loadSetupState();
-    await Promise.all([refreshTopology(), refreshBus(), refreshAgents()]);
-    $("#refresh-audit").click();
+    await Promise.all([refreshTopology(), refreshBus(), refreshAgents(), refreshSessions(), refreshJobs(), refreshWebhooks(), refreshAudit()]);
     const interactions = await api("/interactions?limit=20");
     interactions.events.reverse().forEach((evt) => {
       appendMsg("user", evt.user_text);

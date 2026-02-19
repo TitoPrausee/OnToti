@@ -13,13 +13,15 @@ from . import persona as persona_mod
 from .config_manager import ConfigManager
 from .message_bus import create_message_bus
 from .orchestrator import Orchestrator
+from .policy import check_file_access, check_shell_command, policy_status
 from .provider import ProviderRouter
+from .scheduler import SchedulerManager, default_heartbeat_message
 from .secrets_store import SecretsStore
 from .security import is_client_allowed
 from .store import MemoryStore, default_paths
 
 
-app = FastAPI(title="OnToti", version="0.5.0")
+app = FastAPI(title="OnToti", version="0.9.0")
 paths = default_paths("data")
 config_path = Path("config.json")
 config_manager = ConfigManager(config_path)
@@ -28,6 +30,38 @@ secrets = SecretsStore(paths.root / "secrets.json")
 provider = ProviderRouter(config_path, secrets=secrets)
 bus = create_message_bus(config_manager.load())
 orchestrator = Orchestrator(store=store, paths=paths, provider=provider, config_path=config_path, bus=bus)
+
+
+def _run_chat(session_id: str, text: str) -> dict[str, Any]:
+    return orchestrator.process_user_message(session_id=session_id, text=text)
+
+
+def _heartbeat(channel: str) -> None:
+    message = default_heartbeat_message()
+    store.record_interaction(session_id=f"heartbeat:{channel}", user_text="[heartbeat]", bot_text=message)
+
+
+scheduler = SchedulerManager(
+    list_jobs=store.list_jobs,
+    upsert_job=store.upsert_job,
+    delete_job=store.delete_job,
+    set_job_enabled=store.set_job_enabled,
+    run_chat=_run_chat,
+    heartbeat_fn=_heartbeat,
+    audit_fn=store.log_audit,
+)
+
+
+@app.on_event("startup")
+def startup() -> None:
+    scheduler.start()
+    store.create_session("default", "Default")
+
+
+@app.on_event("shutdown")
+def shutdown() -> None:
+    scheduler.shutdown()
+
 
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
@@ -84,9 +118,34 @@ class ProviderTestIn(BaseModel):
     prompt: str = "Antworte kurz mit: setup ok"
 
 
+class SessionIn(BaseModel):
+    session_id: str
+    display_name: str | None = None
+
+
+class JobIn(BaseModel):
+    job_id: str | None = None
+    name: str
+    cron: str = Field(description="6 fields: sec min hour day month weekday")
+    enabled: bool = True
+    payload: dict[str, Any]
+
+
+class PolicyFileCheckIn(BaseModel):
+    path: str
+
+
+class PolicyShellCheckIn(BaseModel):
+    command: str
+
+
+class WebhookIn(BaseModel):
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
 @app.middleware("http")
 async def tailnet_guard(request: Request, call_next):
-    if request.url.path in {"/health", "/diagnostics"}:
+    if request.url.path in {"/health", "/diagnostics", "/ready"}:
         return await call_next(request)
 
     cfg = config_manager.load()
@@ -122,6 +181,17 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/ready")
+def ready() -> dict[str, Any]:
+    audit = store.verify_audit_chain()
+    provider_info = provider.describe_active()
+    return {
+        "status": "ok" if audit.get("ok") else "degraded",
+        "audit_chain": audit,
+        "provider": provider_info,
+    }
+
+
 @app.get("/diagnostics")
 def diagnostics() -> dict[str, Any]:
     return {
@@ -142,6 +212,27 @@ def security_status() -> dict[str, Any]:
         "tailscale_cidrs": security_cfg.get("tailscale_cidrs", ["100.64.0.0/10"]),
         "tailscale_node_allowlist": security_cfg.get("tailscale_node_allowlist", []),
     }
+
+
+@app.get("/policy/status")
+def get_policy_status() -> dict[str, Any]:
+    return policy_status(config_manager.load())
+
+
+@app.post("/policy/file-check")
+def policy_file_check(payload: PolicyFileCheckIn) -> dict[str, Any]:
+    cfg = config_manager.load()
+    allowed_paths = cfg.get("security", {}).get("allowed_paths", [])
+    ok, reason = check_file_access(payload.path, allowed_paths)
+    return {"ok": ok, "reason": reason}
+
+
+@app.post("/policy/shell-check")
+def policy_shell_check(payload: PolicyShellCheckIn) -> dict[str, Any]:
+    cfg = config_manager.load()
+    sandbox_mode = bool(cfg.get("security", {}).get("sandbox_mode", True))
+    ok, reason = check_shell_command(payload.command, sandbox_mode=sandbox_mode)
+    return {"ok": ok, "reason": reason}
 
 
 @app.get("/provider")
@@ -261,6 +352,7 @@ def setup_apply(payload: SetupApplyIn) -> dict[str, Any]:
 
     bus = create_message_bus(cfg)
     orchestrator = Orchestrator(store=store, paths=paths, provider=provider, config_path=config_path, bus=bus)
+    scheduler.reload()
 
     store.log_audit(
         actor="setup",
@@ -281,6 +373,79 @@ def setup_apply(payload: SetupApplyIn) -> dict[str, Any]:
     }
 
 
+@app.get("/sessions")
+def list_sessions() -> dict[str, Any]:
+    return {"sessions": store.list_sessions()}
+
+
+@app.post("/sessions")
+def create_session(payload: SessionIn) -> dict[str, Any]:
+    session = store.create_session(payload.session_id, payload.display_name)
+    store.log_audit("sessions", "create", {"session_id": payload.session_id}, "ok")
+    return {"session": session}
+
+
+@app.delete("/sessions/{session_id}")
+def delete_session(session_id: str) -> dict[str, str]:
+    store.delete_session(session_id)
+    store.log_audit("sessions", "delete", {"session_id": session_id}, "ok")
+    return {"status": "ok"}
+
+
+@app.get("/jobs")
+def list_jobs() -> dict[str, Any]:
+    return {"jobs": store.list_jobs()}
+
+
+@app.post("/jobs")
+def create_job(payload: JobIn) -> dict[str, Any]:
+    job = scheduler.create_job(name=payload.name, cron=payload.cron, payload=payload.payload, enabled=payload.enabled)
+    store.log_audit("scheduler", "create_job", job, "ok")
+    return {"job": job}
+
+
+@app.put("/jobs/{job_id}")
+def update_job(job_id: str, payload: JobIn) -> dict[str, str]:
+    scheduler.update_job(job_id=job_id, name=payload.name, cron=payload.cron, payload=payload.payload, enabled=payload.enabled)
+    store.log_audit("scheduler", "update_job", {"job_id": job_id}, "ok")
+    return {"status": "ok"}
+
+
+@app.delete("/jobs/{job_id}")
+def delete_job(job_id: str) -> dict[str, str]:
+    scheduler.delete_job(job_id)
+    store.log_audit("scheduler", "delete_job", {"job_id": job_id}, "ok")
+    return {"status": "ok"}
+
+
+@app.post("/jobs/{job_id}/pause")
+def pause_job(job_id: str) -> dict[str, str]:
+    scheduler.pause_job(job_id)
+    store.log_audit("scheduler", "pause_job", {"job_id": job_id}, "ok")
+    return {"status": "ok"}
+
+
+@app.post("/jobs/{job_id}/resume")
+def resume_job(job_id: str) -> dict[str, str]:
+    scheduler.resume_job(job_id)
+    store.log_audit("scheduler", "resume_job", {"job_id": job_id}, "ok")
+    return {"status": "ok"}
+
+
+@app.post("/webhooks/{source}")
+def webhook(source: str, payload: WebhookIn) -> dict[str, str]:
+    store.record_webhook(source=source, payload=payload.payload)
+    text = payload.payload.get("text") or f"Webhook {source}: {payload.payload}"
+    orchestrator.process_user_message(session_id=f"webhook:{source}", text=str(text))
+    store.log_audit("webhook", "ingest", {"source": source}, "ok")
+    return {"status": "accepted"}
+
+
+@app.get("/webhooks")
+def list_webhooks(limit: int = 100) -> dict[str, Any]:
+    return {"events": store.recent_webhooks(limit=limit)}
+
+
 @app.get("/config")
 def config_get() -> dict[str, Any]:
     return config_manager.load()
@@ -292,6 +457,7 @@ def config_put(payload: ConfigUpdateIn) -> dict[str, Any]:
     if not ok:
         raise HTTPException(status_code=400, detail=msg)
     config_manager.save(payload.config)
+    scheduler.reload()
     store.log_audit(actor="config", action="update", payload={"keys": list(payload.config.keys())}, result="ok")
     return {"status": "ok"}
 
@@ -385,3 +551,8 @@ def approve(payload: SkillApproveIn) -> dict[str, Any]:
 @app.get("/audit")
 def audit(limit: int = 50) -> dict[str, Any]:
     return {"events": store.recent_audit(limit=limit)}
+
+
+@app.get("/audit/verify")
+def audit_verify() -> dict[str, Any]:
+    return store.verify_audit_chain()

@@ -11,7 +11,7 @@
     <main class="app-shell">
       <header>
         <h1>OnToti Control</h1>
-        <p>Web-Setup, Message-Bus, Pipeline und Multi-Agent-Topologie</p>
+        <p>Produktions-Setup, Multi-Agent-Topologie, Scheduler und Betriebssteuerung</p>
       </header>
 
       <nav class="tabs">
@@ -19,7 +19,7 @@
         <button class="tab" data-tab="topology">Topologie</button>
         <button class="tab" data-tab="agents">Agents</button>
         <button class="tab" data-tab="bus">Bus</button>
-        <button class="tab" data-tab="audit">Audit</button>
+        <button class="tab" data-tab="ops">Operations</button>
         <button class="tab" data-tab="setup">Setup</button>
         <button class="tab" data-tab="config">Raw Config</button>
       </nav>
@@ -27,7 +27,7 @@
       <section id="chat" class="panel active">
         <div id="chat-log" class="log-box"></div>
         <form id="chat-form" class="row">
-          <input id="session-id" value="default" placeholder="Session ID" />
+          <select id="session-id"></select>
           <input id="chat-input" placeholder="Nachricht an den Bot" />
           <button type="submit">Senden</button>
         </form>
@@ -48,9 +48,64 @@
         <pre id="bus-view" class="code-box"></pre>
       </section>
 
-      <section id="audit" class="panel">
-        <button id="refresh-audit">Aktualisieren</button>
-        <pre id="audit-view" class="code-box"></pre>
+      <section id="ops" class="panel">
+        <div class="config-grid">
+          <div class="card">
+            <h3>Sessions</h3>
+            <div class="row wrap">
+              <input id="new-session-id" placeholder="session-id" />
+              <input id="new-session-name" placeholder="Anzeigename" />
+              <button id="create-session">Session erstellen</button>
+              <button id="reload-sessions">Sessions laden</button>
+            </div>
+            <pre id="sessions-view" class="code-box small"></pre>
+          </div>
+
+          <div class="card">
+            <h3>Scheduler Jobs</h3>
+            <div class="row wrap">
+              <input id="job-name" placeholder="Job Name" />
+              <input id="job-cron" value="0 */15 * * * *" placeholder="Cron (6 Felder)" />
+              <select id="job-kind">
+                <option value="chat_message">chat_message</option>
+                <option value="heartbeat">heartbeat</option>
+              </select>
+              <input id="job-session" value="default" placeholder="Session ID" />
+              <input id="job-text" value="Bitte gib ein kurzes Statusupdate." placeholder="Nachricht/Channel" />
+              <button id="create-job">Job erstellen</button>
+              <button id="reload-jobs">Jobs laden</button>
+            </div>
+            <pre id="jobs-view" class="code-box small"></pre>
+          </div>
+
+          <div class="card">
+            <h3>Policy + Audit</h3>
+            <div class="row wrap">
+              <input id="policy-path" value="/Users/tito1/Desktop/Test/README.md" placeholder="Dateipfad" />
+              <button id="check-path">Pfad prüfen</button>
+            </div>
+            <div class="row wrap">
+              <input id="policy-cmd" value="ls -la" placeholder="Shell Command" />
+              <button id="check-cmd">Command prüfen</button>
+            </div>
+            <div class="row wrap">
+              <button id="verify-audit">Audit Chain prüfen</button>
+              <button id="reload-audit">Audit laden</button>
+            </div>
+            <pre id="policy-view" class="code-box small"></pre>
+          </div>
+
+          <div class="card">
+            <h3>Webhooks</h3>
+            <div class="row wrap">
+              <input id="webhook-source" value="manual" placeholder="source" />
+              <input id="webhook-text" value="Webhook Testnachricht" placeholder="text" />
+              <button id="send-webhook">Webhook senden</button>
+              <button id="reload-webhooks">Webhooks laden</button>
+            </div>
+            <pre id="webhooks-view" class="code-box small"></pre>
+          </div>
+        </div>
       </section>
 
       <section id="setup" class="panel">
@@ -64,6 +119,8 @@
             <select id="setup-provider-active">
               <option value="github_models">github_models</option>
               <option value="openai">openai</option>
+              <option value="anthropic">anthropic</option>
+              <option value="gemini">gemini</option>
               <option value="ollama">ollama</option>
               <option value="lmstudio">lmstudio</option>
             </select>
