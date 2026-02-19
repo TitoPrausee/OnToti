@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -14,10 +14,11 @@ from .config_manager import ConfigManager
 from .orchestrator import Orchestrator
 from .provider import ProviderRouter
 from .secrets_store import SecretsStore
+from .security import is_client_allowed
 from .store import MemoryStore, default_paths
 
 
-app = FastAPI(title="Soul Bot Prototype", version="0.3.0")
+app = FastAPI(title="OnToti", version="0.4.0")
 paths = default_paths("data")
 config_path = Path("config.json")
 config_manager = ConfigManager(config_path)
@@ -65,6 +66,9 @@ class SetupApplyIn(BaseModel):
     provider_api_key_value: str | None = None
     sandbox_mode: bool | None = None
     allowed_paths: list[str] | None = None
+    tailnet_only: bool | None = None
+    tailscale_cidrs: list[str] | None = None
+    tailscale_node_allowlist: list[str] | None = None
     max_active_agents: int | None = None
     use_copilot: bool = False
     copilot_token: str | None = None
@@ -72,6 +76,23 @@ class SetupApplyIn(BaseModel):
 
 class ProviderTestIn(BaseModel):
     prompt: str = "Antworte kurz mit: setup ok"
+
+
+@app.middleware("http")
+async def tailnet_guard(request: Request, call_next):
+    if request.url.path in {"/health", "/diagnostics"}:
+        return await call_next(request)
+
+    cfg = config_manager.load()
+    security_cfg = cfg.get("security", {})
+    client_ip = request.client.host if request.client else ""
+    node_id = request.headers.get("x-tailscale-node")
+    allowed, reason = is_client_allowed(client_ip=client_ip, security_cfg=security_cfg, node_id=node_id)
+
+    if not allowed:
+        return JSONResponse(status_code=403, content={"detail": f"access denied: {reason}"})
+
+    return await call_next(request)
 
 
 @app.get("/")
@@ -82,7 +103,7 @@ def ui():
     return HTMLResponse(
         """
         <html><body style='font-family:sans-serif;padding:20px'>
-        <h2>Soul Bot läuft, aber UI-Datei fehlt.</h2>
+        <h2>OnToti läuft, aber UI-Datei fehlt.</h2>
         <p>Prüfe: <code>app/static/index.html</code></p>
         <p><a href='/docs'>API Docs</a></p>
         </body></html>
@@ -103,6 +124,17 @@ def diagnostics() -> dict[str, Any]:
         "static_exists": static_dir.exists(),
         "index_exists": (static_dir / "index.html").exists(),
         "config_exists": config_path.exists(),
+    }
+
+
+@app.get("/security/status")
+def security_status() -> dict[str, Any]:
+    cfg = config_manager.load()
+    security_cfg = cfg.get("security", {})
+    return {
+        "tailnet_only": bool(security_cfg.get("tailnet_only", False)),
+        "tailscale_cidrs": security_cfg.get("tailscale_cidrs", ["100.64.0.0/10"]),
+        "tailscale_node_allowlist": security_cfg.get("tailscale_node_allowlist", []),
     }
 
 
@@ -163,6 +195,12 @@ def setup_apply(payload: SetupApplyIn) -> dict[str, Any]:
         security_cfg["sandbox_mode"] = payload.sandbox_mode
     if payload.allowed_paths is not None:
         security_cfg["allowed_paths"] = payload.allowed_paths
+    if payload.tailnet_only is not None:
+        security_cfg["tailnet_only"] = payload.tailnet_only
+    if payload.tailscale_cidrs is not None:
+        security_cfg["tailscale_cidrs"] = payload.tailscale_cidrs
+    if payload.tailscale_node_allowlist is not None:
+        security_cfg["tailscale_node_allowlist"] = payload.tailscale_node_allowlist
 
     agents_cfg = cfg.setdefault("agents", {})
     if payload.max_active_agents is not None:
@@ -201,6 +239,7 @@ def setup_apply(payload: SetupApplyIn) -> dict[str, Any]:
         payload={
             "provider_active": cfg.get("provider", {}).get("active"),
             "secrets_count": secrets.public_summary().get("count"),
+            "tailnet_only": cfg.get("security", {}).get("tailnet_only", False),
         },
         result="ok",
     )

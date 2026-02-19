@@ -1,6 +1,6 @@
 {
   "provider": {
-    "active": "ollama",
+    "active": "github_models",
     "options": {
       "github_models": {
         "base_url": "https://models.inference.ai.azure.com",
@@ -31,11 +31,16 @@
   },
   "security": {
     "sandbox_mode": true,
+    "tailnet_only": false,
+    "tailscale_cidrs": [
+      "100.64.0.0/10"
+    ],
+    "tailscale_node_allowlist": [],
     "allowed_paths": [
       "/Users/tito1/Desktop/Test"
     ]
   },
   "agents": {
-    "max_active": 3
+    "max_active": 4
   }
 }

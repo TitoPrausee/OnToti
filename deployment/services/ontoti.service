@@ -1,0 +1,16 @@
+[Unit]
+Description=OnToti AI Assistant
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ontoti
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/ontoti/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+User=ontoti
+Group=ontoti
+
+[Install]
+WantedBy=multi-user.target

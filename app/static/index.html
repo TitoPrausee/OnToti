@@ -3,15 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Soul Bot Control</title>
+    <title>OnToti Control</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <div class="bg"></div>
     <main class="app-shell">
       <header>
-        <h1>Soul Bot Control</h1>
-        <p>Finalisierter Prototyp mit Web-Setup, Copilot-Wizard und Multi-Agent-Basis</p>
+        <h1>OnToti Control</h1>
+        <p>Web-Setup, Copilot-Wizard und Multi-Agent-Basis</p>
       </header>
 
       <nav class="tabs">
@@ -58,17 +58,20 @@
             <input id="setup-provider-base-url" placeholder="Base URL" />
             <input id="setup-provider-model" placeholder="Model" />
             <input id="setup-provider-key-env" value="GITHUB_TOKEN" placeholder="API Key ENV Name" />
-            <input id="setup-provider-key-value" type="password" placeholder="API Key (wird lokal in data/secrets.json gespeichert)" />
+            <input id="setup-provider-key-value" type="password" placeholder="API Key (lokal gespeichert)" />
 
             <h3>3) Security + Agents</h3>
             <label class="inline-check"><input id="setup-sandbox-mode" type="checkbox" checked /> Sandbox aktiv</label>
+            <label class="inline-check"><input id="setup-tailnet-only" type="checkbox" /> Tailnet-only Zugriff</label>
+            <input id="setup-tailscale-cidrs" value="100.64.0.0/10" placeholder="Tailscale CIDRs (Komma-getrennt)" />
+            <input id="setup-node-allowlist" placeholder="Tailscale Node Allowlist (Komma-getrennt)" />
             <input id="setup-allowed-paths" value="/Users/tito1/Desktop/Test" placeholder="Allow Paths (Komma-getrennt)" />
             <input id="setup-max-agents" value="4" type="number" min="1" max="32" placeholder="Max aktive Agenten" />
           </div>
 
           <div class="card">
             <h3>4) Copilot Quick Setup</h3>
-            <p>Optional: GitHub Token prüfen und direkt auf <code>github_models</code> umstellen.</p>
+            <p>Optional: GitHub Token prüfen und auf <code>github_models</code> umstellen.</p>
             <label class="inline-check"><input id="setup-use-copilot" type="checkbox" /> Copilot jetzt verbinden</label>
             <input id="setup-copilot-token" type="password" placeholder="GitHub Token" />
 

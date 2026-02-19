@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  ontoti:
+    image: ontoti:latest
+    container_name: ontoti
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./skills:/app/skills
+      - ./config.json:/app/config.json
+    environment:
+      - TZ=UTC
+    depends_on:
+      - redis
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: ontoti-redis
+    restart: always

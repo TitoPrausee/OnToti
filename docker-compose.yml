@@ -1,20 +1,35 @@
 version: "3.9"
 services:
-  bot:
-    build: .
-    container_name: soul-bot
+  ontoti:
+    build:
+      context: .
+      target: runtime
+    container_name: ontoti
     ports:
       - "8000:8000"
     volumes:
       - ./data:/app/data
       - ./skills:/app/skills
+      - ./config.json:/app/config.json
     environment:
       - TZ=UTC
     depends_on:
       - redis
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    container_name: soul-bot-redis
+    container_name: ontoti-redis
     ports:
       - "6379:6379"
+    restart: unless-stopped
+
+  chromium:
+    image: browserless/chrome:latest
+    container_name: ontoti-chromium
+    profiles: ["browser"]
+    ports:
+      - "3000:3000"
+    environment:
+      - TOKEN=ontoti
+    restart: unless-stopped

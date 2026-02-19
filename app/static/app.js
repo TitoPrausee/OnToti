@@ -34,10 +34,18 @@ function appendMsg(role, text) {
   $("#chat-log").scrollTop = $("#chat-log").scrollHeight;
 }
 
+function splitCsv(value) {
+  return value
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
 function fillSetupForm(state) {
   const cfg = state.config || {};
   const persona = state.persona || {};
   const provider = cfg.provider || {};
+  const security = cfg.security || {};
   const active = provider.active || "github_models";
   const activeCfg = (provider.options || {})[active] || {};
 
@@ -47,8 +55,11 @@ function fillSetupForm(state) {
   $("#setup-provider-base-url").value = activeCfg.base_url || "";
   $("#setup-provider-model").value = activeCfg.model || "";
   $("#setup-provider-key-env").value = activeCfg.api_key_env || "GITHUB_TOKEN";
-  $("#setup-sandbox-mode").checked = !!(cfg.security || {}).sandbox_mode;
-  $("#setup-allowed-paths").value = ((cfg.security || {}).allowed_paths || []).join(", ");
+  $("#setup-sandbox-mode").checked = !!security.sandbox_mode;
+  $("#setup-tailnet-only").checked = !!security.tailnet_only;
+  $("#setup-tailscale-cidrs").value = (security.tailscale_cidrs || ["100.64.0.0/10"]).join(", ");
+  $("#setup-node-allowlist").value = (security.tailscale_node_allowlist || []).join(", ");
+  $("#setup-allowed-paths").value = (security.allowed_paths || []).join(", ");
   $("#setup-max-agents").value = (cfg.agents || {}).max_active || 4;
 
   $("#setup-state-view").textContent = JSON.stringify(state, null, 2);
@@ -100,7 +111,10 @@ $("#setup-apply").addEventListener("click", async () => {
     provider_api_key_env: $("#setup-provider-key-env").value.trim() || null,
     provider_api_key_value: $("#setup-provider-key-value").value.trim() || null,
     sandbox_mode: $("#setup-sandbox-mode").checked,
-    allowed_paths: $("#setup-allowed-paths").value.split(",").map((v) => v.trim()).filter(Boolean),
+    tailnet_only: $("#setup-tailnet-only").checked,
+    tailscale_cidrs: splitCsv($("#setup-tailscale-cidrs").value),
+    tailscale_node_allowlist: splitCsv($("#setup-node-allowlist").value),
+    allowed_paths: splitCsv($("#setup-allowed-paths").value),
     max_active_agents: Number($("#setup-max-agents").value || 4),
     use_copilot: $("#setup-use-copilot").checked,
     copilot_token: $("#setup-copilot-token").value.trim() || null,
